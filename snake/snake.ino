@@ -44,20 +44,20 @@ Food foodStock[1] = {}; // Tableau de nourriture
 unsigned  long greenFoodTime = 0;
 unsigned  long redFoodTime = 0;
 unsigned  long blueFoodTime = 0;
-unsigned long foodInterval = 10000; // 10 secondes
+unsigned  long foodInterval = 10000; // 10 secondes
+
+unsigned  long mouvementTime = 0;
+unsigned  long mouvementInterval = 100;
 
 // direction de base
-String axis = "verticale"; 
+String axis = "horizontale"; 
 int sens = 1;
 // variables pour bloquer les changements en sens opposé
 int lastDir = sens; 
 String lastAxis = axis;
 
 void setup() {
-  matrix.fillScreen(matrix.Color333(5, 66, 0)); // Éteint tout les leds
-  delay(1000);
-  matrix.fillScreen(matrix.Color333(0, 0, 0)); // Éteint tout les leds
-  delay(1000);
+  matrix.begin();
   Serial.begin(9600);
 
 
@@ -75,8 +75,10 @@ void setup() {
 
 // dessine le serpent sur la matrice de leds
 void drawSnake(){
+  int snakeSize = sizeof(snake) / sizeof(snake[0]);
   // Pour toute les partie du serpent(0 à taille(serpent)-1) pris en sens inverse
-  for(int i = sizeof(snake)-1; i>=0; i--){
+  for(int i = snakeSize; i>=0; i--){
+    //matrix.drawPixel(snake[i].x, snake[i].y, Wheel(3))
     matrix.drawPixel(snake[i].x, snake[i].y, Wheel(3)); // Allumage du pixel correspondant à cette partie
   }
 }
@@ -135,6 +137,11 @@ void moveSnake(String axis, int sens) {
 
   snake[0].x += dx;
   snake[0].y += dy;
+  // vérification des bordures
+  if(snake[0].x == 64 && axis == "horizontale") snake[0].x=0;
+  if(snake[0].x == -1 && axis == "horizontale") snake[0].x=63;
+  if(snake[0].y == -1 && axis == "verticale") snake[0].y=63;
+  if(snake[0].y == 64 && axis == "verticale") snake[0].y=0;
 }
 
 // Permet de changer axis et dir avec un joystick
@@ -195,12 +202,10 @@ uint16_t Wheel(byte WheelPos) {
 
 
 void loop() {
-  Serial.println(sizeof(snake)/sizeof(snake[0]));
   matrix.fillScreen(matrix.Color333(0, 0, 0)); // Éteint la matrice pour allumer a nouveaux tout les éléments
   changeMov();
   moveSnake(axis, sens);
   drawSnake();
-  showFood();
   // Générer la nourriture toutes bleu les 10 secondes
   if (millis() - blueFoodTime > foodInterval) {
     generateFood(3); // ou une autre couleur
@@ -217,5 +222,5 @@ void loop() {
     greenFoodTime = millis();
   }
 
-  delay(500);
+  delay(200);
 }
