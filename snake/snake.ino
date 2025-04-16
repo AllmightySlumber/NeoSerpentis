@@ -1,4 +1,3 @@
-
 /*!
  * @file testRGBMatrix.ino
  * @brief Run the routine to test the RGB LED Matrix Panel
@@ -12,6 +11,8 @@
  
 #include <DFRobot_RGBMatrix.h> // Hardware-specific library
 #include <List.hpp>
+#include <EEPROM.h>
+#include "TimerThree.h"
 
 #define OE   	9
 #define LAT 	10
@@ -39,6 +40,15 @@ struct Food{
   Position p;
   int couleur;
 };
+const int BLEU=16;
+const int VERT=8;
+const int ORANGE=2;
+const int ROUGE=0;
+const int V_MAX = 80;
+const int V_MIN = 320;
+int VITESSE = 200;
+int VIE = 1;
+bool SNAKE_LIVING = true;
 
 List<Position> snake; // Tableau de position du serpent de base
 List<Food> foodStock; // Tableau de nourriture
@@ -47,6 +57,7 @@ const int NOURRITURE_MAX = 15;
 unsigned  long greenFoodTime = 0;
 unsigned  long redFoodTime = 0;
 unsigned  long blueFoodTime = 0;
+unsigned  long orangeFoodTime = 0;
 unsigned  long foodInterval = 10000; // 10 secondes
 
 unsigned  long mouvementTime = 0;
@@ -63,29 +74,33 @@ void setup() {
   matrix.begin();
   Serial.begin(9600);
 
-
+  size_t const address {0};
+  unsigned int seed {};
+  EEPROM.get(address, seed);
+  randomSeed(seed);
+  EEPROM.put(address, seed +1 );
 
   // Initalise les positions du serpent en début de partie
   snake.add({0,2}); // (0, 2)
   snake.add({0,1}); // (0, 1)
   snake.add({0,0}); // (0, 0)
 
-  foodStock.add({{35, 35}, 8}); // food{ p= {35, 35}, couleur = 8}
-  foodStock.add({{24, 56}, 16}); // food{ p= {24, 56}, couleur = 16}
+  foodStock.add({{random(0,64), random(0,64)}, 8}); // génère une nourriture verte aléatoire
+  foodStock.add({{random(0,64), random(0,64)}, 16}); // génère une nourriture bleu aléatoire
 }
 
 // dessine le serpent sur la matrice de leds
 void drawSnake(){
   // Pour toute les partie du serpent(0 à taille(serpent)-1) pris en sens inverse
   for(int i = snake.getSize()-1; i>=0; i--){
-    matrix.drawPixel(snake.get(i).x, snake.get(i).y, Wheel(3)); // Allumage du pixel correspondant à cette partie
+    matrix.drawPixel(snake.get(i).x, snake.get(i).y,matrix.Color333(34, 0, 150)); // Allumage du pixel correspondant à cette partie
   }
 }
 
 // Cette fonction créer de la nourriture de la couleur qui est passé en paramètre
 // Elle sera utiliser avec un timer
 void generateFood(int couleur){
-  if(foodStock.getSize() <= NOURRITURE_MAX){
+  if(foodStock.getSize() < NOURRITURE_MAX){
     bool isFood = false; // booléen servant à valider les coordonées de la nourriture générer
     int food_x;
     int food_y;
@@ -111,13 +126,24 @@ void generateFood(int couleur){
     food.p.y = food_y;
     food.couleur = couleur;
     foodStock.add(food);
+    //deleteFood(food); //Faire avec un timer
   }
 }
 
 void showFood(){
   // Calcule de la taille de la liste de nourriture
-  for (int i=0; i<foodStock.getSize(); i++){ // 
+  for (int i=0; i<foodStock.getSize(); i++){ 
     matrix.drawPixel(foodStock.get(i).p.x, foodStock.get(i).p.y, Wheel(foodStock.get(i).couleur));
+  }
+}
+void deleteFood(Food food){
+  Food curent_food;
+  for (int i=0; i<foodStock.getSize(); i++){ 
+    curent_food = foodStock.get(i);
+    if(curent_food.p.x == food.p.x && curent_food.p.y == food.p.y){ // Si la nourriture actuel a les mêmes coordonées que celle qu'on doit supprimer
+      foodStock.remove(i);
+      matrix.drawPixel(foodStock.get(i).p.x, foodStock.get(i).p.y, Wheel(foodStock.get(i).couleur));
+    }
   }
 }
 
@@ -216,7 +242,28 @@ void snakeEat(){
   for (int i=0; i<foodStock.getSize(); i++){ // On parcours la liste de nourriture
     Food food = foodStock.get(i);
     if(food.p.x==snake_x && food.p.y == snake_y){ // Si le serpent entre en contacte avec de la nourriture avec sa tête
-      snake.add(snake[ snake.getSize()-1 ]); // On ajoute au serpent son dernier pixel
+      // Selon la couleur de la nourriture
+      int food_couleur = food.couleur;
+      if(food_couleur==BLEU){ // Si c'est bleu on augment la taille
+        snake.add(snake[ snake.getSize()-1 ]); // On ajoute au serpent son dernier pixel
+      }
+      else if(food_couleur==VERT){ // Si c'est vert on augmente la vitesse en la divisant par deux et on ajoute une vie
+        if(VITESSE > V_MAX){
+          VITESSE = VITESSE -= 15;
+          Serial.println(VITESSE);
+        }
+        VIE++;
+      }
+      else if(food_couleur==ORANGE){ // Si c'est orange on ralentit la vitesse en la multipliant par deux et on enlève une vie
+        if(VITESSE < V_MIN){
+          VITESSE = VITESSE += 15;
+          Serial.println(VITESSE);
+        }
+        VIE--;
+      }
+      else if(food_couleur==ROUGE){ // On tue le serpent en faisant une animation
+        SNAKE_LIVING = false;
+      }
       foodStock.remove(i); // Enlève la nourriture de la liste.
     }
   }
@@ -239,26 +286,54 @@ uint16_t Wheel(byte WheelPos) {
 
 
 void loop() {
-  Serial.println(foodStock.getSize());
-  changeMov();
-  moveSnake(axis, sens);
-  showFood();
-  snakeEat();
-  drawSnake();
-  // Générer la nourriture toutes bleu les 10 secondes
-  if (millis() - blueFoodTime > foodInterval) {
-    generateFood(16); // ou une autre couleur
-    blueFoodTime = millis();
+  if(SNAKE_LIVING){
+    changeMov();
+    moveSnake(axis, sens);
+    showFood();
+    snakeEat();
+    drawSnake();
+    // Générer la nourriture toutes les 5 à 13 secondes aléatoirement
+    if (millis() - blueFoodTime > random(foodInterval * 0.5, foodInterval * 1.3)) {
+      generateFood(BLEU); // ou une autre couleur
+      blueFoodTime = millis();
+    }
+    // Générer la nourriture toutes les 10 à 18 secondes aléatoirement
+    if (millis() - greenFoodTime > random(foodInterval, foodInterval * 1.8)) {
+      generateFood(VERT); // ou une autre couleur
+      greenFoodTime = millis();
+    }
+    // Générer la nourriture toutes les 10 à 18 secondes aléatoirement
+    if (millis() - orangeFoodTime > random(foodInterval, foodInterval * 1.8)) {
+      generateFood(ORANGE); // ou une autre couleur
+      orangeFoodTime = millis();
+    }
+
+    // Générer la nourriture toutes rouge les 15 à 23 secondes aléatoirement
+    if (millis() - redFoodTime > random(foodInterval * 1.5, foodInterval * 1.8)) {
+      generateFood(ROUGE); // ou une autre couleur
+      redFoodTime = millis();
+    }
+    
+    delay(320);
   }
-  // Générer la nourriture toutes rouge les 15 secondes
-  if (millis() - redFoodTime > (foodInterval * 1.5)) {
-    generateFood(0); // ou une autre couleur
-    redFoodTime = millis();
+  else{
+    
+    while(!SNAKE_LIVING){
+      matrix.fillScreen(matrix.Color333(0, 0, 0));
+      delay(100);
+      matrix.setCursor(21, 21);
+      matrix.setTextColor(matrix.Color333(7,7,7));
+      matrix.println("GAME");
+
+      matrix.setCursor(21, 21 + 7*2);
+      matrix.println("OVER");
+
+
+
+
+      delay(1000); // Attendre 2 secondes avant de réinitialiser le jeu ou de faire autre chose
+        // Vous pouvez ajouter ici une condition pour réinitialiser le jeu ou sortir de la boucle
+    
+    }
   }
-  // Générer la nourriture toutes verte les 20 secondes
-  if (millis() - greenFoodTime > (foodInterval * 2)) {
-    generateFood(8); // ou une autre couleur
-    greenFoodTime = millis();
-  }
-  delay(200);
 }
