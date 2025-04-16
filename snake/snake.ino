@@ -1,3 +1,4 @@
+
 /*!
  * @file testRGBMatrix.ino
  * @brief Run the routine to test the RGB LED Matrix Panel
@@ -10,6 +11,7 @@
  */
  
 #include <DFRobot_RGBMatrix.h> // Hardware-specific library
+#include <List.hpp>
 
 #define OE   	9
 #define LAT 	10
@@ -38,9 +40,10 @@ struct Food{
   int couleur;
 };
 
-Position snake[3] = {}; // Tableau de position du serpent de base
-Food foodStock[1] = {}; // Tableau de nourriture
+List<Position> snake; // Tableau de position du serpent de base
+List<Food> foodStock; // Tableau de nourriture
 
+const int NOURRITURE_MAX = 15;
 unsigned  long greenFoodTime = 0;
 unsigned  long redFoodTime = 0;
 unsigned  long blueFoodTime = 0;
@@ -61,62 +64,60 @@ void setup() {
   Serial.begin(9600);
 
 
+
   // Initalise les positions du serpent en début de partie
-  // (0, 0)
-  snake[0].x = 0;
-  snake[0].y = 2;
-  // (1, 0)
-  snake[1].x = 0;
-  snake[1].y = 1;
-  // (2, 0)
-  snake[2].x = 0;
-  snake[2].y = 0;
+  snake.add({0,2}); // (0, 2)
+  snake.add({0,1}); // (0, 1)
+  snake.add({0,0}); // (0, 0)
+
+  foodStock.add({{35, 35}, 8}); // food{ p= {35, 35}, couleur = 8}
+  foodStock.add({{24, 56}, 16}); // food{ p= {24, 56}, couleur = 16}
 }
 
 // dessine le serpent sur la matrice de leds
 void drawSnake(){
-  int snakeSize = sizeof(snake) / sizeof(snake[0]);
   // Pour toute les partie du serpent(0 à taille(serpent)-1) pris en sens inverse
-  for(int i = snakeSize; i>=0; i--){
-    //matrix.drawPixel(snake[i].x, snake[i].y, Wheel(3))
-    matrix.drawPixel(snake[i].x, snake[i].y, Wheel(3)); // Allumage du pixel correspondant à cette partie
+  for(int i = snake.getSize()-1; i>=0; i--){
+    matrix.drawPixel(snake.get(i).x, snake.get(i).y, Wheel(3)); // Allumage du pixel correspondant à cette partie
   }
 }
 
 // Cette fonction créer de la nourriture de la couleur qui est passé en paramètre
 // Elle sera utiliser avec un timer
 void generateFood(int couleur){
-  bool isFood = false; // booléen servant à valider les coordonées de la nourriture générer
-  int food_x;
-  int food_y;
-  Food food;
+  if(foodStock.getSize() <= NOURRITURE_MAX){
+    bool isFood = false; // booléen servant à valider les coordonées de la nourriture générer
+    int food_x;
+    int food_y;
+    Food food;
 
-  while(!isFood){ // Tant que les coordonées de la nourriture ne sont pas validé.
-    // génèration des coordonées x  et y entre 0 et 64
-    food_x = random(0, 65); 
-    food_y = random(0, 65); 
+    while(!isFood){ // Tant que les coordonées de la nourriture ne sont pas validé.
+      // génèration des coordonées x  et y entre 0 et 64
+      food_x = random(0, 65); 
+      food_y = random(0, 65); 
 
-    isFood = true; // On a temporairement générer de la nourriture
-    
-    // On vérifie que ce ne soit pas déjà un pixel du serpent
-    int snakeSize = sizeof(snake) / sizeof(snake[0]);
-    for(int i =0; i<snakeSize; i++){
-      if (food_x == snake[i].x && food_y == snake[i].y){ // Si la nourriture fait partie des coordonées du serpent
-        isFood = false;
+      isFood = true; // On a temporairement générer de la nourriture
+      
+      // On vérifie que ce ne soit pas déjà un pixel du serpent
+      for(int i =0; i<snake.getSize() ; i++){
+        if (food_x == snake.get(i).x && food_y == snake.get(i).y){ // Si la nourriture fait partie des coordonées du serpent
+          isFood = false;
+        }
       }
     }
-  }
 
-  // on ajoute a la liste de nourriture
-  food.p.x = food_x;
-  food.p.y = food_y;
-  food.couleur = couleur;
+    // on ajoute a la liste de nourriture
+    food.p.x = food_x;
+    food.p.y = food_y;
+    food.couleur = couleur;
+    foodStock.add(food);
+  }
 }
 
 void showFood(){
-  int stockSize = sizeof(foodStock) / sizeof(foodStock[0]); // Calcule de la taille de la liste de nourriture
-  for (int i=0; i<stockSize; i++){ // 
-    matrix.drawPixel(foodStock[i].p.x, foodStock[i].p.y, Wheel(foodStock[i].couleur));
+  // Calcule de la taille de la liste de nourriture
+  for (int i=0; i<foodStock.getSize(); i++){ // 
+    matrix.drawPixel(foodStock.get(i).p.x, foodStock.get(i).p.y, Wheel(foodStock.get(i).couleur));
   }
 }
 
@@ -124,24 +125,49 @@ void showFood(){
 // Si le sens est positif le serpent va soit vers la droite soit vers le haut selon l'axe, 
 // Si le sens est négatif il va soit vers le bas soit vers la gauche.
 void moveSnake(String axis, int sens) {
-  int snakeSize = sizeof(snake) / sizeof(snake[0]);
+  //int snakeSize = sizeof(snake) / sizeof(snake[0]);
 
   int dx = 0, dy = 0;
   // Calcule de la nouvelle direction
   if (axis == "horizontale") dx = sens;
   else if (axis == "verticale") dy = sens;
 
-  for (int i = snakeSize - 1; i > 0; i--) {
-    snake[i] = snake[i - 1];
+  int taille = snake.getSize() - 1;
+  for (int i = taille; i > 0; i--) {
+    if(i == taille){
+      matrix.drawPixel(snake.get(i).x,  snake.get(i).y, matrix.Color333(0, 0, 0));
+    }
+    snake.remove(i);
+    snake.addAtIndex(i, snake.get(i - 1));
+    // snake[i] = snake.get(i - 1);
   }
 
-  snake[0].x += dx;
-  snake[0].y += dy;
+  // On ajoute à l'élément en tête dx et dy en x et y
+  int nouvelle_x = snake.get(0).x + dx;
+  int nouvelle_y = snake.get(0).y + dy;
+  snake.remove(0);
+  snake.addAtIndex(0, {nouvelle_x, nouvelle_y}) ;
   // vérification des bordures
-  if(snake[0].x == 64 && axis == "horizontale") snake[0].x=0;
-  if(snake[0].x == -1 && axis == "horizontale") snake[0].x=63;
-  if(snake[0].y == -1 && axis == "verticale") snake[0].y=63;
-  if(snake[0].y == 64 && axis == "verticale") snake[0].y=0;
+  if(snake.get(0).x == 64 && axis == "horizontale"){
+    int y = snake.get(0).y;
+    snake.remove(0);
+    snake.addAtIndex(0, {0, y}) ;
+  }
+  if(snake.get(0).x == -1 && axis == "horizontale"){
+    int y = snake.get(0).y;
+    snake.remove(0);
+    snake.addAtIndex(0, {63, y}) ;
+  }
+  if(snake.get(0).y == -1 && axis == "verticale"){
+    int x = snake.get(0).x;
+    snake.remove(0);
+    snake.addAtIndex(0, {x, 63}) ;
+  }
+  if(snake.get(0).y == 64 && axis == "verticale"){
+    int x = snake.get(0).x;
+    snake.remove(0);
+    snake.addAtIndex(0, {x, 0}) ;
+  }
 }
 
 // Permet de changer axis et dir avec un joystick
@@ -182,8 +208,19 @@ void changeMov() {
 
 
 // Implemente ce qui se passe lorsque le serpent mange quelque chose
-void snakeEat(Food food){
-  
+void snakeEat(){
+
+  int snake_x = snake.get(0).x;
+  int snake_y = snake.get(0).y;
+
+  for (int i=0; i<foodStock.getSize(); i++){ // On parcours la liste de nourriture
+    Food food = foodStock.get(i);
+    if(food.p.x==snake_x && food.p.y == snake_y){ // Si le serpent entre en contacte avec de la nourriture avec sa tête
+      snake.add(snake[ snake.getSize()-1 ]); // On ajoute au serpent son dernier pixel
+      foodStock.remove(i); // Enlève la nourriture de la liste.
+    }
+  }
+
 }
 
 // Input a value 0 to 24 to get a color value.
@@ -202,25 +239,26 @@ uint16_t Wheel(byte WheelPos) {
 
 
 void loop() {
-  matrix.fillScreen(matrix.Color333(0, 0, 0)); // Éteint la matrice pour allumer a nouveaux tout les éléments
+  Serial.println(foodStock.getSize());
   changeMov();
   moveSnake(axis, sens);
+  showFood();
+  snakeEat();
   drawSnake();
   // Générer la nourriture toutes bleu les 10 secondes
   if (millis() - blueFoodTime > foodInterval) {
-    generateFood(3); // ou une autre couleur
+    generateFood(16); // ou une autre couleur
     blueFoodTime = millis();
   }
-  // Générer la nourriture toutes rouge les 10 secondes
+  // Générer la nourriture toutes rouge les 15 secondes
   if (millis() - redFoodTime > (foodInterval * 1.5)) {
-    generateFood(3); // ou une autre couleur
+    generateFood(0); // ou une autre couleur
     redFoodTime = millis();
   }
-  // Générer la nourriture toutes verte les 10 secondes
+  // Générer la nourriture toutes verte les 20 secondes
   if (millis() - greenFoodTime > (foodInterval * 2)) {
-    generateFood(3); // ou une autre couleur
+    generateFood(8); // ou une autre couleur
     greenFoodTime = millis();
   }
-
   delay(200);
 }
