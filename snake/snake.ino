@@ -12,7 +12,7 @@
 #include <DFRobot_RGBMatrix.h> // Hardware-specific library
 #include <List.hpp>
 #include <EEPROM.h>
-#include "TimerThree.h"
+#include "TimerFour.h"
 
 #define OE   	9
 #define LAT 	10
@@ -50,10 +50,12 @@ int VITESSE = 200;
 int VIE = 1;
 bool SNAKE_LIVING = true;
 
-List<Position> snake; // Tableau de position du serpent de base
-List<Food> foodStock; // Tableau de nourriture
+TimerFour timer;
 
-const int NOURRITURE_MAX = 15;
+List<Position> snake; // Tableau de position du serpent de base
+volatile List<Food> foodStock; // Tableau de nourriture
+
+const int NOURRITURE_MAX = 20;
 unsigned  long greenFoodTime = 0;
 unsigned  long redFoodTime = 0;
 unsigned  long blueFoodTime = 0;
@@ -85,8 +87,16 @@ void setup() {
   snake.add({0,1}); // (0, 1)
   snake.add({0,0}); // (0, 0)
 
-  foodStock.add({{random(0,64), random(0,64)}, 8}); // génère une nourriture verte aléatoire
-  foodStock.add({{random(0,64), random(0,64)}, 16}); // génère une nourriture bleu aléatoire
+  Food food = {{random(0,64), random(0,64)}, VERT}; // génère une nourriture verte aléatoire
+  foodStock.add(food); 
+
+  food = {{random(0,64), random(0,64)}, BLEU}; // génère une nourriture verte aléatoire
+  foodStock.add(food);
+
+  int randTime = random(7, 11) * 1000000;; // Temps aléatoire entre 5s et 12s
+  timer.initialize(randTime);
+  timer.attachInterrupt(deleteFood);
+
 }
 
 // dessine le serpent sur la matrice de leds
@@ -126,7 +136,6 @@ void generateFood(int couleur){
     food.p.y = food_y;
     food.couleur = couleur;
     foodStock.add(food);
-    //deleteFood(food); //Faire avec un timer
   }
 }
 
@@ -136,15 +145,22 @@ void showFood(){
     matrix.drawPixel(foodStock.get(i).p.x, foodStock.get(i).p.y, Wheel(foodStock.get(i).couleur));
   }
 }
-void deleteFood(Food food){
-  Food curent_food;
-  for (int i=0; i<foodStock.getSize(); i++){ 
-    curent_food = foodStock.get(i);
-    if(curent_food.p.x == food.p.x && curent_food.p.y == food.p.y){ // Si la nourriture actuel a les mêmes coordonées que celle qu'on doit supprimer
-      foodStock.remove(i);
-      matrix.drawPixel(foodStock.get(i).p.x, foodStock.get(i).p.y, Wheel(foodStock.get(i).couleur));
-    }
+void deleteFood(){
+  if(foodStock.getSize()<3){ // Si la taille des nourriture pourrie est inférieur à 3 on supprime le premier de la liste et l'éteint
+    Food food = foodStock.get(0);
+    matrix.drawPixel(food.p.x, food.p.y, matrix.Color333(0,0,0)); 
+    foodStock.remove(0);
   }
+  else{
+    int randInt = random(0, 3);
+    Food food = foodStock.get(randInt);
+    matrix.drawPixel(food.p.x, food.p.y, matrix.Color333(0,0,0)); 
+    foodStock.remove(randInt);
+  }
+  // // Rappelle de la fonction au bout de 5 - 12 secondes
+  int randTime = random(5, 13) * 1000000;; // Temps aléatoire entre 5s et 12s
+  timer.initialize(randTime);
+  timer.attachInterrupt(deleteFood);
 }
 
 // Fait bouger le serpent dans selon le bon axe
@@ -328,12 +344,7 @@ void loop() {
       matrix.setCursor(21, 21 + 7*2);
       matrix.println("OVER");
 
-
-
-
-      delay(1000); // Attendre 2 secondes avant de réinitialiser le jeu ou de faire autre chose
-        // Vous pouvez ajouter ici une condition pour réinitialiser le jeu ou sortir de la boucle
-    
+      delay(1000);    
     }
   }
 }
