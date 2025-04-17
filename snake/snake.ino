@@ -1,18 +1,7 @@
-/*!
- * @file testRGBMatrix.ino
- * @brief Run the routine to test the RGB LED Matrix Panel
- * @copyright   Copyright (c) 2010 DFRobot Co.Ltd (http://www.dfrobot.com)
- * @license     The MIT License (MIT)
- * @author [TangJie]](jie.tang@dfrobot.com)
- * @version  V1.0.1
- * @date  2022-03-23
- * @url https://github.com/DFRobot/DFRobot_RGBMatrix
- */
- 
 #include <DFRobot_RGBMatrix.h> // Hardware-specific library
 #include <List.hpp>
 #include <EEPROM.h>
-#include "TimerFour.h"
+#include <TimerFour.h>
 
 #define OE   	9
 #define LAT 	10
@@ -40,6 +29,10 @@ struct Food{
   Position p;
   int couleur;
 };
+struct Obstacle{
+  List<Position> v;
+};
+
 const int BLEU=16;
 const int VERT=8;
 const int ORANGE=2;
@@ -75,6 +68,9 @@ String lastAxis = axis;
 void setup() {
   matrix.begin();
   Serial.begin(9600);
+  Serial1.begin(9600);
+  Serial1.println("Yes OK");
+  delay(5000);
 
   size_t const address {0};
   unsigned int seed {};
@@ -87,16 +83,17 @@ void setup() {
   snake.add({0,1}); // (0, 1)
   snake.add({0,0}); // (0, 0)
 
-  Food food = {{random(0,64), random(0,64)}, VERT}; // génère une nourriture verte aléatoire
-  foodStock.add(food); 
-
-  food = {{random(0,64), random(0,64)}, BLEU}; // génère une nourriture verte aléatoire
-  foodStock.add(food);
-
-  int randTime = random(7, 11) * 1000000;; // Temps aléatoire entre 5s et 12s
+  int randTime = random(10, 16) * 1000000;; // Temps aléatoire entre 10s et 15s
   timer.initialize(randTime);
   timer.attachInterrupt(deleteFood);
 
+  Food food = {{random(0,64), random(0,64)}, VERT}; // génère une nourriture verte aléatoire
+  foodStock.add(food);
+
+  food = {{random(0,64), random(0,64)}, BLEU}; // génère une nourriture verte aléatoire
+  foodStock.add(food);
+  showFood();
+  delay(2000);
 }
 
 // dessine le serpent sur la matrice de leds
@@ -158,7 +155,7 @@ void deleteFood(){
     foodStock.remove(randInt);
   }
   // // Rappelle de la fonction au bout de 5 - 12 secondes
-  int randTime = random(5, 13) * 1000000;; // Temps aléatoire entre 5s et 12s
+  int randTime = random(10, 16) * 1000000;; // Temps aléatoire entre 10s et 15s
   timer.initialize(randTime);
   timer.attachInterrupt(deleteFood);
 }
@@ -210,6 +207,7 @@ void moveSnake(String axis, int sens) {
     snake.remove(0);
     snake.addAtIndex(0, {x, 0}) ;
   }
+  checkSelfCollision();
 }
 
 // Permet de changer axis et dir avec un joystick
@@ -247,6 +245,15 @@ void changeMov() {
   }
 }
 
+void checkSelfCollision() {
+  Position head = snake.get(0);
+  for (int i = 1; i < snake.getSize(); i++) {
+    if (head.x == snake.get(i).x && head.y == snake.get(i).y) {
+      SNAKE_LIVING = false;
+      break;
+    }
+  }
+}
 
 
 // Implemente ce qui se passe lorsque le serpent mange quelque chose
@@ -276,6 +283,9 @@ void snakeEat(){
           Serial.println(VITESSE);
         }
         VIE--;
+        Position p = snake.get(snake.getSize()-1);
+        snake.removeLast();
+        matrix.drawPixel(p.x, p.y, matrix.Color333(0, 0, 0));
       }
       else if(food_couleur==ROUGE){ // On tue le serpent en faisant une animation
         SNAKE_LIVING = false;
@@ -305,7 +315,6 @@ void loop() {
   if(SNAKE_LIVING){
     changeMov();
     moveSnake(axis, sens);
-    showFood();
     snakeEat();
     drawSnake();
     // Générer la nourriture toutes les 5 à 13 secondes aléatoirement
@@ -329,14 +338,13 @@ void loop() {
       generateFood(ROUGE); // ou une autre couleur
       redFoodTime = millis();
     }
-    
-    delay(320);
+    showFood();
+    delay(VITESSE);
   }
   else{
-    
     while(!SNAKE_LIVING){
       matrix.fillScreen(matrix.Color333(0, 0, 0));
-      delay(100);
+      delay(500);
       matrix.setCursor(21, 21);
       matrix.setTextColor(matrix.Color333(7,7,7));
       matrix.println("GAME");
