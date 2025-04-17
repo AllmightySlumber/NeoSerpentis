@@ -38,7 +38,7 @@ const int VERT=8;
 const int ORANGE=2;
 const int ROUGE=0;
 const int V_MAX = 80;
-const int V_MIN = 320;
+const int V_MIN = 200;
 int VITESSE = 200;
 int VIE = 1;
 bool SNAKE_LIVING = true;
@@ -69,7 +69,8 @@ void setup() {
   matrix.begin();
   Serial.begin(9600);
   Serial1.begin(9600);
-  Serial1.println("Yes OK");
+  Serial1.println(VITESSE);
+  Serial1.println(snake.getSize()-3);
   delay(5000);
 
   size_t const address {0};
@@ -269,23 +270,35 @@ void snakeEat(){
       int food_couleur = food.couleur;
       if(food_couleur==BLEU){ // Si c'est bleu on augment la taille
         snake.add(snake[ snake.getSize()-1 ]); // On ajoute au serpent son dernier pixel
+        Serial1.println("S:" + String(snake.getSize() - 3));
       }
       else if(food_couleur==VERT){ // Si c'est vert on augmente la vitesse en la divisant par deux et on ajoute une vie
         if(VITESSE > V_MAX){
-          VITESSE = VITESSE -= 15;
-          Serial.println(VITESSE);
+          VITESSE = (random(1,3) == 2) ? VITESSE -= 10 : VITESSE;
+          Serial1.println("V:" + String((200 - VITESSE)/10));
+          Serial.print("envoyé : ");
+          Serial.print("Vitesse : ");
+          Serial.println((200 - VITESSE) /10);
         }
-        VIE++;
+        snake.add(snake[ snake.getSize()-1 ]); // On ajoute au serpent son dernier pixel
+        Serial1.println("S:" + String(snake.getSize() - 3));
+        Serial.print("envoyé : ");
+        Serial.println(snake.getSize()-3);
+
       }
       else if(food_couleur==ORANGE){ // Si c'est orange on ralentit la vitesse en la multipliant par deux et on enlève une vie
         if(VITESSE < V_MIN){
-          VITESSE = VITESSE += 15;
-          Serial.println(VITESSE);
+          VITESSE = (random(1,5) == 4) ? VITESSE += 10 : VITESSE;
+          Serial.print("Vitesse : ");
+          Serial.println((200 - VITESSE) /10);
+          Serial1.println("V:" + String( (200 - VITESSE) /10));
         }
-        VIE--;
+        // Enlève un pixel au serpent
         Position p = snake.get(snake.getSize()-1);
         snake.removeLast();
         matrix.drawPixel(p.x, p.y, matrix.Color333(0, 0, 0));
+        Serial1.println("S:" + String(snake.getSize() - 3));
+        SNAKE_LIVING = (snake.getSize() < 3) ? false : true; // Si la taille du serpent est inférieur à trois le serpent meurt (de base la taille c'est 3)
       }
       else if(food_couleur==ROUGE){ // On tue le serpent en faisant une animation
         SNAKE_LIVING = false;
@@ -342,6 +355,7 @@ void loop() {
     delay(VITESSE);
   }
   else{
+    Serial1.println("G:OVER");
     while(!SNAKE_LIVING){
       matrix.fillScreen(matrix.Color333(0, 0, 0));
       delay(500);
