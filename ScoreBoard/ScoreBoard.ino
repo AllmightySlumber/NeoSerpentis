@@ -60,24 +60,32 @@ void startAnimation() {
     matrix.print(title);
     delay(40);
   }
-
   delay(300);
   matrix.fillScreen(matrix.Color333(0, 0, 0));
 }
 
-
-
-
-
-
 void beginScoreBoard(){
+  matrix.fillScreen(matrix.Color333(0, 0, 0));
   score = "0";
   speed = "0";
   afficherScoreBoard;
 }
 
 void afficherScoreBoard() {
-  matrix.fillScreen(matrix.Color333(0, 0, 0));
+  // Suppression du score (seulement le nombre)
+  for(int y =0; y < 7; y++){
+    for (int x=0; x < 63-36; x++){
+      matrix.drawPixel(36 + x, y, matrix.Color333(0, 0, 0));
+    }
+  }
+
+  // Suppression de la vitesse (seulement le nombre)
+  for(int y =0; y < 7; y++){
+    for (int x=0; x < 63-48; x++){
+      matrix.drawPixel(48 + x, 16 + y, matrix.Color333(0, 0, 0));
+    }
+  }
+
   matrix.setTextColor(matrix.Color333(7, 7, 0));
   
   matrix.setCursor(0, 0);
@@ -90,20 +98,17 @@ void afficherScoreBoard() {
 }
 
 void afficherGameOver() {
-  matrix.fillScreen(matrix.Color333(0, 0, 0));
   matrix.setTextColor(matrix.Color333(7, 7, 0));
-  
-  matrix.setCursor(0, 0);
-  matrix.print("Score:");
-  matrix.print(score);
 
-  matrix.setCursor(0, 16);
-  matrix.print("Vitesse:");
-  matrix.print(speed);
-
+  // Suppression du Game Over
+  for(int y =0; y < 7; y++){
+    for (int x=0; x < 64; x++){
+      matrix.drawPixel(x, 32 + y, matrix.Color333(0, 0, 0));
+    }
+  }
+  delay(500);
   matrix.setCursor(0, 32);
   matrix.print("Game Over");
-  
 }
 
 
@@ -133,8 +138,6 @@ void loop() {
       lastBlinkTime = millis();
       afficherGameOver();
       delay(1000);
-      afficherScoreBoard();
-      delay(500);
     }
     if (Serial1.available()) {
       message = Serial1.readStringUntil('\n');

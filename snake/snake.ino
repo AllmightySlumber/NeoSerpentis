@@ -353,7 +353,7 @@ void GameOver(){
 
 void loop() {
   if(SNAKE_LIVING && ! pauseMenu){
-    joystickX = analogRead(JOYSTICK_X)
+    joystickX = analogRead(JOYSTICK_X);
     pauseMenu = (joystickY == 1023) ? true : false;
     changeMov();
     moveSnake(axis, sens);
