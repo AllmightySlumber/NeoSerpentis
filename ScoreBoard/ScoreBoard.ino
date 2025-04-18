@@ -34,25 +34,42 @@ unsigned long blinkInterval = 1000; // 1s allumé
 
 void setup() {
   matrix.begin();
+  matrix.setTextWrap(false);
   Serial.begin(9600);
   Serial1.begin(9600);
+  startAnimation();
+  delay(500);
   
   beginScoreBoard();
 }
 
-// Input a value 0 to 24 to get a color value.
-// The colours are a transition r - g - b - back to r.
-uint16_t Wheel(byte WheelPos) {
-  if(WheelPos < 8) {
-   return matrix.Color333(7 - WheelPos, WheelPos, 0);
-  } else if(WheelPos < 16) {
-   WheelPos -= 8;
-   return matrix.Color333(0, 7-WheelPos, WheelPos);
-  } else {
-   WheelPos -= 16;
-   return matrix.Color333(0, WheelPos, 7 - WheelPos);
+void startAnimation() {
+  matrix.fillScreen(matrix.Color333(0, 0, 0));
+  matrix.setTextWrap(false); // ⚠️ Empêche les retours à la ligne !
+
+  const char* title = "NeoSerpentis";
+  int textLength = strlen(title) * 6; // 5px + 1px d'espacement
+  int startX = 64;
+  int endX = -textLength;
+  int y = 26; // Ligne verticale centrale (ajuste si besoin)
+
+  for (int x = startX; x >= endX; x--) {
+    matrix.fillScreen(matrix.Color333(0, 0, 0));
+    matrix.setCursor(x, y);
+    matrix.setTextColor(matrix.Color333(7, 0, 7));
+    matrix.print(title);
+    delay(40);
   }
+
+  delay(300);
+  matrix.fillScreen(matrix.Color333(0, 0, 0));
 }
+
+
+
+
+
+
 void beginScoreBoard(){
   score = "0";
   speed = "0";

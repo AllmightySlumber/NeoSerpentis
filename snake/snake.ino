@@ -42,6 +42,7 @@ const int V_MIN = 200;
 int VITESSE = 200;
 int VIE = 1;
 bool SNAKE_LIVING = true;
+bool pauseMenu = false;
 
 TimerFour timer;
 
@@ -351,7 +352,9 @@ void GameOver(){
 
 
 void loop() {
-  if(SNAKE_LIVING){
+  if(SNAKE_LIVING && ! pauseMenu){
+    joystickX = analogRead(JOYSTICK_X)
+    pauseMenu = (joystickY == 1023) ? true : false;
     changeMov();
     moveSnake(axis, sens);
     snakeEat();
@@ -380,7 +383,7 @@ void loop() {
     showFood();
     delay(VITESSE);
   }
-  else {
+  else if (!SNAKE_LIVING){
   unsigned long currentMillis = millis();
   
   if (currentMillis - lastBlinkTime >= blinkInterval) {
