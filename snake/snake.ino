@@ -58,6 +58,12 @@ unsigned  long foodInterval = 10000; // 10 secondes
 unsigned  long mouvementTime = 0;
 unsigned  long mouvementInterval = 100;
 
+bool showGameOver = true;
+unsigned long lastBlinkTime = 0;
+unsigned long blinkInterval = 1000; // 1s allumé
+bool gameOver = false;
+
+
 // direction de base
 String axis = "horizontale"; 
 int sens = 1;
@@ -65,38 +71,43 @@ int sens = 1;
 int lastDir = sens; 
 String lastAxis = axis;
 
+int joystickX;
+int joystickY;
+
 void setup() {
   matrix.begin();
   Serial.begin(9600);
   Serial1.begin(9600);
-  Serial1.println(VITESSE);
-  Serial1.println(snake.getSize()-3);
-  delay(5000);
-
   size_t const address {0};
   unsigned int seed {};
   EEPROM.get(address, seed);
   randomSeed(seed);
   EEPROM.put(address, seed +1 );
 
-  // Initalise les positions du serpent en début de partie
+  startGame();
+}
+void startGame(){
+  VITESSE = 200;
+  snake.clear();
   snake.add({0,2}); // (0, 2)
   snake.add({0,1}); // (0, 1)
   snake.add({0,0}); // (0, 0)
 
-  int randTime = random(10, 16) * 1000000;; // Temps aléatoire entre 10s et 15s
-  timer.initialize(randTime);
-  timer.attachInterrupt(deleteFood);
+  Serial1.println(VITESSE);
+  Serial1.println(snake.getSize()-3);
 
+  foodStock.clear();
   Food food = {{random(0,64), random(0,64)}, VERT}; // génère une nourriture verte aléatoire
   foodStock.add(food);
 
   food = {{random(0,64), random(0,64)}, BLEU}; // génère une nourriture verte aléatoire
   foodStock.add(food);
   showFood();
-  delay(2000);
-}
 
+  int randTime = random(10, 16) * 1000000;; // Temps aléatoire entre 10s et 15s
+  timer.initialize(randTime);
+  timer.attachInterrupt(deleteFood);
+}
 // dessine le serpent sur la matrice de leds
 void drawSnake(){
   // Pour toute les partie du serpent(0 à taille(serpent)-1) pris en sens inverse
@@ -213,32 +224,32 @@ void moveSnake(String axis, int sens) {
 
 // Permet de changer axis et dir avec un joystick
 void changeMov() {
-  int x = analogRead(JOYSTICK_X);
-  int y = analogRead(JOYSTICK_Y);
+  joystickX = analogRead(JOYSTICK_X);
+  joystickY = analogRead(JOYSTICK_Y);
 
   // Création d'une zone pour laquel les valeurs n'affectent pas le mouvement
   int zoneMorteMin = 400;
   int zoneMorteMax = 700;
   // Changement de mouvement pour aller vers la droite
-  if (x > zoneMorteMax && lastAxis != "horizontale") {
+  if (joystickX > zoneMorteMax && lastAxis != "horizontale") {
     axis = "horizontale";
     sens = 1;
     lastAxis = "horizontale";
     lastDir = sens;
   } // Changement de mouvement pour aller vers la gauche
-  else if (x < zoneMorteMin && lastAxis != "horizontale") {
+  else if (joystickX < zoneMorteMin && lastAxis != "horizontale") {
     axis = "horizontale";
     sens = -1;
     lastAxis = "horizontale";
     lastDir = sens;
   } // Changement de mouvement pour aller vers le haut
-  else if (y > zoneMorteMax && lastAxis != "verticale") {
+  else if (joystickY > zoneMorteMax && lastAxis != "verticale") {
     axis = "verticale";
     sens = -1;
     lastAxis = "verticale";
     lastDir = sens;
   } // Changement de mouvement pour aller vers le bas
-  else if (y < zoneMorteMin && lastAxis != "verticale") {
+  else if (joystickY < zoneMorteMin && lastAxis != "verticale") {
     axis = "verticale";
     sens = 1;
     lastAxis = "verticale";
@@ -251,6 +262,8 @@ void checkSelfCollision() {
   for (int i = 1; i < snake.getSize(); i++) {
     if (head.x == snake.get(i).x && head.y == snake.get(i).y) {
       SNAKE_LIVING = false;
+      Serial1.println("G:OVER");
+      GameOver();
       break;
     }
   }
@@ -298,10 +311,16 @@ void snakeEat(){
         snake.removeLast();
         matrix.drawPixel(p.x, p.y, matrix.Color333(0, 0, 0));
         Serial1.println("S:" + String(snake.getSize() - 3));
-        SNAKE_LIVING = (snake.getSize() < 3) ? false : true; // Si la taille du serpent est inférieur à trois le serpent meurt (de base la taille c'est 3)
+        if(snake.getSize() < 3) {
+          SNAKE_LIVING = false; // Si la taille du serpent est inférieur à trois le serpent meurt (de base la taille c'est 3)
+          Serial1.println("G:OVER");
+          GameOver();
+        }
       }
       else if(food_couleur==ROUGE){ // On tue le serpent en faisant une animation
         SNAKE_LIVING = false;
+        Serial1.println("G:OVER");
+        GameOver();
       }
       foodStock.remove(i); // Enlève la nourriture de la liste.
     }
@@ -322,6 +341,13 @@ uint16_t Wheel(byte WheelPos) {
    return matrix.Color333(0, WheelPos, 7 - WheelPos);
   }
 }
+void GameOver(){
+  gameOver = true;
+  showGameOver = true;
+  lastBlinkTime = millis();
+  blinkInterval = 1000;
+}
+
 
 
 void loop() {
@@ -354,19 +380,38 @@ void loop() {
     showFood();
     delay(VITESSE);
   }
-  else{
-    Serial1.println("G:OVER");
-    while(!SNAKE_LIVING){
+  else {
+  unsigned long currentMillis = millis();
+  
+  if (currentMillis - lastBlinkTime >= blinkInterval) {
+    lastBlinkTime = currentMillis;
+    showGameOver = !showGameOver;
+
+    if (showGameOver) {
+      // Affiche "Game Over"
       matrix.fillScreen(matrix.Color333(0, 0, 0));
-      delay(500);
       matrix.setCursor(21, 21);
       matrix.setTextColor(matrix.Color333(7,7,7));
       matrix.println("GAME");
-
       matrix.setCursor(21, 21 + 7*2);
       matrix.println("OVER");
-
-      delay(1000);    
+      blinkInterval = 1000; // Texte affiché 1 seconde
+    } else {
+      // Éteint l’écran
+      matrix.fillScreen(matrix.Color333(0, 0, 0));
+      blinkInterval = 500; // Pause 0.5 seconde
     }
   }
+
+  joystickX = analogRead(JOYSTICK_X);
+  if (joystickX == 1023) {
+    SNAKE_LIVING = true;
+    gameOver = false;
+    matrix.fillScreen(matrix.Color333(0, 0, 0));
+    Serial1.println("B");
+    startGame(); // Redémarre la partie proprement
+
+  }
+}
+
 }

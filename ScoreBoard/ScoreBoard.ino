@@ -23,9 +23,13 @@ DFRobot_RGBMatrix matrix(A, B, C, D, E, CLK, LAT, OE, false, WIDTH, _HIGH);
 TimerFour timer;
 
 String message;
-String score = "0";
-String speed = "0";
+String score;
+String speed;
 bool gameOver = false;
+
+unsigned long lastBlinkTime = 0;
+unsigned long blinkInterval = 1000; // 1s allumé
+
 
 
 void setup() {
@@ -33,7 +37,7 @@ void setup() {
   Serial.begin(9600);
   Serial1.begin(9600);
   
-  afficherScoreBoard();
+  beginScoreBoard();
 }
 
 // Input a value 0 to 24 to get a color value.
@@ -48,6 +52,11 @@ uint16_t Wheel(byte WheelPos) {
    WheelPos -= 16;
    return matrix.Color333(0, WheelPos, 7 - WheelPos);
   }
+}
+void beginScoreBoard(){
+  score = "0";
+  speed = "0";
+  afficherScoreBoard;
 }
 
 void afficherScoreBoard() {
@@ -103,13 +112,20 @@ void loop() {
     }
   }
   else{
-    for (int i =0; i<5; i++){
+    if(millis() - lastBlinkTime > blinkInterval ){
+      lastBlinkTime = millis();
       afficherGameOver();
       delay(1000);
       afficherScoreBoard();
       delay(500);
     }
-    
+    if (Serial1.available()) {
+      message = Serial1.readStringUntil('\n');
+      if (message.startsWith("B")) {
+        beginScoreBoard();
+        gameOver = false;
+      }
+    }
   }
  
 }
