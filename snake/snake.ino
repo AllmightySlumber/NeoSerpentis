@@ -41,7 +41,7 @@ const int V_MAX = 80;
 const int V_MIN = 200;
 int VITESSE = 200;
 int VIE = 1;
-bool SNAKE_LIVING = true;
+bool startGame = false;
 bool pauseMenu = false;
 
 TimerFour timer;
@@ -62,18 +62,37 @@ unsigned  long mouvementInterval = 100;
 bool showGameOver = true;
 unsigned long lastBlinkTime = 0;
 unsigned long blinkInterval = 1000; // 1s allumé
+
 bool gameOver = false;
+bool homeMenu = true;
+bool commandeBool = false;
+bool regleBool = false; 
+int homeChoice = 1;
+int pauseChoice = 1;
+bool justArrived = false;
+
+unsigned long homeLastChoix = 0;
+unsigned long homeChoixInterval = 400;
+unsigned  long regleLastChange = 0;
+unsigned  long regleChangeInterval = 400;
+unsigned  long commandeLastChange = 0;
+unsigned  long commandeChangeInterval = 400;
+unsigned  long pauseMenuLastChoice = 0;
+unsigned  long pauseMenuInterval = 400;
 
 
 // direction de base
 String axis = "horizontale"; 
 int sens = 1;
+String axisStored = axis;
+int sensStored = sens;
 // variables pour bloquer les changements en sens opposé
 int lastDir = sens; 
 String lastAxis = axis;
 
 int joystickX;
 int joystickY;
+bool joystickPressed = false;
 
 void setup() {
   matrix.begin();
@@ -85,9 +104,118 @@ void setup() {
   randomSeed(seed);
   EEPROM.put(address, seed +1 );
 
-  startGame();
+  snake.add({0,2}); // (0, 2)
+  snake.add({0,1}); // (0, 1)
+  snake.add({0,0}); // (0, 0)
+
+  Food food = {{random(0,64), random(0,64)}, VERT}; // génère une nourriture verte aléatoire
+  foodStock.add(food);
+
+  food = {{random(0,64), random(0,64)}, BLEU}; // génère une nourriture verte aléatoire
+  foodStock.add(food);
+  showFood();
+
+  int randTime = random(10, 16) * 1000000;; // Temps aléatoire entre 10s et 15s
+  timer.initialize(randTime);
+  timer.attachInterrupt(deleteFood);
+
 }
-void startGame(){
+
+// Fonction pour naviguer et sélection une option dans le home menu
+void changeHomeChoice(){
+  // Lecture Joystick
+  joystickY = analogRead(JOYSTICK_Y);
+  joystickX = analogRead(JOYSTICK_X);
+
+  if(joystickX == 1023 && !joystickPressed){ // Détection d'appui sur le joystick
+    joystickPressed = true;
+    homeLastChoix = millis();
+    Serial1.println(homeChoice);
+    Serial.println("Sélectionné : " + String(homeChoice));
+    if (homeChoice == 1){ // Lancement du jeu
+      homeMenu = false;
+      startGame = true;
+      axis = axisStored; 
+      sens = sensStored;
+      restartGame();
+      delay(500);
+    }
+    else if(homeChoice == 2){ // Lancement de la page des commandes
+      commandeBool = true;
+      homeMenu = false;
+    }
+    else if (homeChoice == 3){ // Lancement de la page des règles
+      regleBool = true;
+      homeMenu = false;
+    }
+  }
+  else if(joystickX < 1000){ // Joystick relaché
+    joystickPressed = false;
+    if (joystickY > 700){ // Sélection de l'option du dessus
+      homeLastChoix = millis();
+      homeChoice = (homeChoice == 1) ? 3 : (homeChoice == 2) ? 1 : 2; // si on est déjà tout en haut on repasse en bas 
+      // sinon si on est au deuxième on passe au 1 etc
+      Serial1.println("C:"+ String(homeChoice));
+      Serial.println("Envoyé : " + String(homeChoice));
+    }
+    else if (joystickY < 400){ // Sélection de l'option du dessous
+      homeLastChoix = millis();
+      homeChoice = (homeChoice == 1) ? 2 : (homeChoice == 2) ? 3 : 1;
+      Serial1.println("C:"+ String(homeChoice));
+      Serial.println("Envoyé : " + String(homeChoice));
+    }
+  }
+}
+// Fonction pour naviguer entre les pages de règle et revenir au home menu
+void changeRegleTexte(){
+  joystickX = analogRead(JOYSTICK_X);
+  if (joystickX == 1023 && !joystickPressed){
+    joystickPressed = true;
+    Serial.println("Retour au menu : " + String(joystickX));
+    regleLastChange = millis();
+    homeMenu = true;
+    regleBool = false;
+    Serial1.println("M");
+  }
+  else if (joystickX < 1000){
+    joystickPressed = false;
+    if (joystickX < 400){
+      regleLastChange = millis();
+      Serial1.println("P"); // P pour précédent
+    }
+    else if (joystickX > 700 && joystickX <1000){
+      regleLastChange = millis();
+      Serial1.println("S"); // S pour suivant
+    }
+  }
+}
+// Fonction pour naviguer entre les commande et revenir au home menu
+void changeCommande(){
+  joystickX = analogRead(JOYSTICK_X);
+  if (joystickX == 1023 && !joystickPressed){
+    joystickPressed = true;
+    Serial.println("Retour au menu : " + String(joystickX));
+    commandeLastChange = millis();
+    homeMenu = true;
+    commandeBool = false;
+    Serial1.println("M");
+  }
+  else if (joystickX < 1000){
+    joystickPressed = false;
+    if (joystickX < 400){
+      commandeLastChange = millis();
+      Serial1.println("P"); // P pour précédent
+      Serial.print("joystick change commande P");
+    }
+    else if (joystickX > 700 && joystickX <1000){
+      commandeLastChange = millis();
+      Serial1.println("S"); // S pour suivant
+      Serial.println("Joystick change commande S");
+    }
+  }
+}
+// Fonction pour relancer le jeu proprement une fois une partie terminé ou abandonner
+void restartGame(){
   VITESSE = 200;
   snake.clear();
   snake.add({0,2}); // (0, 2)
@@ -109,16 +237,15 @@ void startGame(){
   timer.initialize(randTime);
   timer.attachInterrupt(deleteFood);
 }
-// dessine le serpent sur la matrice de leds
+// Fonction pour dessiner le serpent sur la matrice
 void drawSnake(){
+  // Extinction du dernier pixel
   // Pour toute les partie du serpent(0 à taille(serpent)-1) pris en sens inverse
   for(int i = snake.getSize()-1; i>=0; i--){
-    matrix.drawPixel(snake.get(i).x, snake.get(i).y,matrix.Color333(34, 0, 150)); // Allumage du pixel correspondant à cette partie
+    matrix.drawPixel(snake.get(i).x, snake.get(i).y, matrix.Color333(7, 0, 7)); // Allumage du pixel correspondant à cette partie
   }
 }
-
-// Cette fonction créer de la nourriture de la couleur qui est passé en paramètre
-// Elle sera utiliser avec un timer
+// Fonction pour créer une nourriture de la couleur passé en paramètre
 void generateFood(int couleur){
   if(foodStock.getSize() < NOURRITURE_MAX){
     bool isFood = false; // booléen servant à valider les coordonées de la nourriture générer
@@ -148,13 +275,14 @@ void generateFood(int couleur){
     foodStock.add(food);
   }
 }
-
+// Fonction pour afficher de la nourriture
 void showFood(){
   // Calcule de la taille de la liste de nourriture
   for (int i=0; i<foodStock.getSize(); i++){ 
     matrix.drawPixel(foodStock.get(i).p.x, foodStock.get(i).p.y, Wheel(foodStock.get(i).couleur));
   }
 }
+// Fonction pour supprimer de la nourriture et la rendre invisible
 void deleteFood(){
   if(foodStock.getSize()<3){ // Si la taille des nourriture pourrie est inférieur à 3 on supprime le premier de la liste et l'éteint
     Food food = foodStock.get(0);
@@ -172,13 +300,8 @@ void deleteFood(){
   timer.initialize(randTime);
   timer.attachInterrupt(deleteFood);
 }
-
-// Fait bouger le serpent dans selon le bon axe
-// Si le sens est positif le serpent va soit vers la droite soit vers le haut selon l'axe, 
-// Si le sens est négatif il va soit vers le bas soit vers la gauche.
+// Fonction pour faire avancer le serpent
 void moveSnake(String axis, int sens) {
-  //int snakeSize = sizeof(snake) / sizeof(snake[0]);
-
   int dx = 0, dy = 0;
   // Calcule de la nouvelle direction
   if (axis == "horizontale") dx = sens;
@@ -191,7 +314,6 @@ void moveSnake(String axis, int sens) {
     }
     snake.remove(i);
     snake.addAtIndex(i, snake.get(i - 1));
-    // snake[i] = snake.get(i - 1);
   }
 
   // On ajoute à l'élément en tête dx et dy en x et y
@@ -222,8 +344,7 @@ void moveSnake(String axis, int sens) {
   }
   checkSelfCollision();
 }
-
-// Permet de changer axis et dir avec un joystick
+// Fonction pour changer la direction et le sens dans lequel avance le serpent
 void changeMov() {
   joystickX = analogRead(JOYSTICK_X);
   joystickY = analogRead(JOYSTICK_Y);
@@ -257,23 +378,21 @@ void changeMov() {
     lastDir = sens;
   }
 }
-
+// Fonction qui implémente ce qui se passe si le serpent entre en collision avec lui même
 void checkSelfCollision() {
   Position head = snake.get(0);
   for (int i = 1; i < snake.getSize(); i++) {
     if (head.x == snake.get(i).x && head.y == snake.get(i).y) {
-      SNAKE_LIVING = false;
+      startGame = false;
+      gameOver = true;
       Serial1.println("G:OVER");
       GameOver();
       break;
     }
   }
 }
-
-
 // Implemente ce qui se passe lorsque le serpent mange quelque chose
 void snakeEat(){
-
   int snake_x = snake.get(0).x;
   int snake_y = snake.get(0).y;
 
@@ -283,12 +402,19 @@ void snakeEat(){
       // Selon la couleur de la nourriture
       int food_couleur = food.couleur;
       if(food_couleur==BLEU){ // Si c'est bleu on augment la taille
+      if(VITESSE > V_MAX){
+          VITESSE = (random(1,4) == 3) ? VITESSE -= 10 : VITESSE;
+          Serial1.println("V:" + String((200 - VITESSE)/10));
+          Serial.print("envoyé : ");
+          Serial.print("Vitesse : ");
+          Serial.println((200 - VITESSE) /10);
+        }
         snake.add(snake[ snake.getSize()-1 ]); // On ajoute au serpent son dernier pixel
         Serial1.println("S:" + String(snake.getSize() - 3));
       }
       else if(food_couleur==VERT){ // Si c'est vert on augmente la vitesse en la divisant par deux et on ajoute une vie
         if(VITESSE > V_MAX){
-          VITESSE = (random(1,3) == 2) ? VITESSE -= 10 : VITESSE;
+          VITESSE = (random(1,5) == 4) ? VITESSE -= 10 : VITESSE;
           Serial1.println("V:" + String((200 - VITESSE)/10));
           Serial.print("envoyé : ");
           Serial.print("Vitesse : ");
@@ -298,7 +424,6 @@ void snakeEat(){
         Serial1.println("S:" + String(snake.getSize() - 3));
         Serial.print("envoyé : ");
         Serial.println(snake.getSize()-3);
-
       }
       else if(food_couleur==ORANGE){ // Si c'est orange on ralentit la vitesse en la multipliant par deux et on enlève une vie
         if(VITESSE < V_MIN){
@@ -313,13 +438,15 @@ void snakeEat(){
         matrix.drawPixel(p.x, p.y, matrix.Color333(0, 0, 0));
         Serial1.println("S:" + String(snake.getSize() - 3));
         if(snake.getSize() < 3) {
-          SNAKE_LIVING = false; // Si la taille du serpent est inférieur à trois le serpent meurt (de base la taille c'est 3)
+          startGame = false; // Si la taille du serpent est inférieur à trois le serpent meurt (de base la taille c'est 3)
+          gameOver = true;
           Serial1.println("G:OVER");
           GameOver();
         }
       }
       else if(food_couleur==ROUGE){ // On tue le serpent en faisant une animation
-        SNAKE_LIVING = false;
+        startGame = false;
+        gameOver = true;
         Serial1.println("G:OVER");
         GameOver();
       }
@@ -342,54 +469,62 @@ uint16_t Wheel(byte WheelPos) {
    return matrix.Color333(0, WheelPos, 7 - WheelPos);
   }
 }
+// Fonction qui est appelé lorsqu'une partie viens de finir
 void GameOver(){
   gameOver = true;
   showGameOver = true;
   lastBlinkTime = millis();
   blinkInterval = 1000;
 }
-
-
-
-void loop() {
-  if(SNAKE_LIVING && ! pauseMenu){
-    joystickX = analogRead(JOYSTICK_X);
-    pauseMenu = (joystickY == 1023) ? true : false;
-    changeMov();
-    moveSnake(axis, sens);
-    snakeEat();
-    drawSnake();
-    // Générer la nourriture toutes les 5 à 13 secondes aléatoirement
-    if (millis() - blueFoodTime > random(foodInterval * 0.5, foodInterval * 1.3)) {
-      generateFood(BLEU); // ou une autre couleur
-      blueFoodTime = millis();
-    }
-    // Générer la nourriture toutes les 10 à 18 secondes aléatoirement
-    if (millis() - greenFoodTime > random(foodInterval, foodInterval * 1.8)) {
-      generateFood(VERT); // ou une autre couleur
-      greenFoodTime = millis();
-    }
-    // Générer la nourriture toutes les 10 à 18 secondes aléatoirement
-    if (millis() - orangeFoodTime > random(foodInterval, foodInterval * 1.8)) {
-      generateFood(ORANGE); // ou une autre couleur
-      orangeFoodTime = millis();
-    }
-
-    // Générer la nourriture toutes rouge les 15 à 23 secondes aléatoirement
-    if (millis() - redFoodTime > random(foodInterval * 1.5, foodInterval * 1.8)) {
-      generateFood(ROUGE); // ou une autre couleur
-      redFoodTime = millis();
-    }
-    showFood();
-    delay(VITESSE);
+// Fonction qui implémente le déroulement d'une partie
+void gameFunction(){
+  joystickX = analogRead(JOYSTICK_X);
+  if (joystickX == 1023 && !joystickPressed){
+    joystickPressed = true;
+    pauseMenu =true;
+    startGame = false;
+    Serial1.println("P"); // Envoie de pause au l'autre Arduino
+    Serial.println("Mise en pause du jeu");
+    timer.stop(); // Arrêt de la fonction deleteFood
   }
-  else if (!SNAKE_LIVING){
-  unsigned long currentMillis = millis();
+  if (joystickX < 1000) joystickPressed = false;
+  changeMov();
+  moveSnake(axis, sens);
+  snakeEat();
   
+  //Position snakeLastPixel = snake.get(snake.getSize()-1);
+  matrix.drawPixel(snake.get(snake.getSize()).x, snake.get(snake.getSize()).y, matrix.Color333(0, 0, 0));
+  drawSnake();
+  // Générer la nourriture toutes les 5 à 13 secondes aléatoirement
+  if (millis() - blueFoodTime > random(foodInterval * 0.5, foodInterval * 1.3)) {
+    generateFood(BLEU); // ou une autre couleur
+    blueFoodTime = millis();
+  }
+  // Générer la nourriture toutes les 10 à 18 secondes aléatoirement
+  if (millis() - greenFoodTime > random(foodInterval, foodInterval * 1.8)) {
+    generateFood(VERT); // ou une autre couleur
+    greenFoodTime = millis();
+  }
+  // Générer la nourriture toutes les 10 à 18 secondes aléatoirement
+  if (millis() - orangeFoodTime > random(foodInterval, foodInterval * 1.8)) {
+    generateFood(ORANGE); // ou une autre couleur
+    orangeFoodTime = millis();
+  }
+
+  // Générer la nourriture toutes rouge les 15 à 23 secondes aléatoirement
+  if (millis() - redFoodTime > random(foodInterval * 1.5, foodInterval * 1.8)) {
+    generateFood(ROUGE); // ou une autre couleur
+    redFoodTime = millis();
+  }
+  showFood();
+}
+// Fonction qui implémente ce qui se passe lorsqu'une partie est finie
+void gameOverFunction(){
+  unsigned long currentMillis = millis();
+  // Clignotement de Game Over
   if (currentMillis - lastBlinkTime >= blinkInterval) {
     lastBlinkTime = currentMillis;
     showGameOver = !showGameOver;
-
     if (showGameOver) {
       // Affiche "Game Over"
       matrix.fillScreen(matrix.Color333(0, 0, 0));
@@ -405,16 +540,93 @@ void loop() {
       blinkInterval = 500; // Pause 0.5 seconde
     }
   }
-
+  // Relancement du jeu
   joystickX = analogRead(JOYSTICK_X);
   if (joystickX == 1023) {
-    SNAKE_LIVING = true;
+    joystickPressed = true;
+    axis = axisStored; 
+    sens = sensStored;
+    startGame = true;
     gameOver = false;
     matrix.fillScreen(matrix.Color333(0, 0, 0));
+    restartGame(); // Redémarrage de la partie proprement
     Serial1.println("B");
-    startGame(); // Redémarre la partie proprement
-
   }
 }
 
+void pauseFunction(){
+  // Lecture Joystick
+  joystickY = analogRead(JOYSTICK_Y);
+  joystickX = analogRead(JOYSTICK_X);
+
+  if(joystickX == 1023 && !joystickPressed){ // Détection d'appui sur le joystick
+    joystickPressed = true;
+    pauseMenuLastChoice = millis();
+    Serial1.println(pauseChoice);
+    Serial.println("Sélectionné : " + String(pauseChoice));
+    if (pauseChoice == 1){ // Lancement du jeu
+      pauseMenu = false;
+      startGame = true;
+      timer.start();
+      Serial.println("Choix : Continuer le jeu");
+      delay(500);
+    }
+    else if(pauseChoice == 2){ // Lancement de la page des commandes
+      homeChoice = 1;
+      pauseChoice = 1;
+      homeMenu = true;
+      pauseMenu = false;
+      matrix.fillScreen(matrix.Color333(0, 0, 0));
+      Serial.println("Choix : Menu home");
+    }
+  }
+  else if(joystickX < 1000){ // Joystick relaché
+    joystickPressed = false;
+    if (joystickY > 700){ // Sélection de l'option du dessus
+      pauseMenuLastChoice = millis();
+      pauseChoice = (pauseChoice == 1) ? 2 : 1;
+      Serial1.println("C:"+ String(pauseChoice));
+      Serial.println("Envoyé : " + String(pauseChoice));
+    }
+    else if (joystickY < 400){ // Sélection de l'option du dessous
+      pauseMenuLastChoice = millis();
+      pauseChoice = (pauseChoice == 1) ? 2 : 1;
+      Serial1.println("C:"+ String(pauseChoice));
+      Serial.println("Envoyé : " + String(pauseChoice));
+    }
+  }
+}
+
+void loop() {
+  if (homeMenu){
+    if(millis() - homeLastChoix > homeChoixInterval) {// Si notre dernier choix remonte à 200 milisecondes on peut à nouveaux choisir
+      changeHomeChoice();
+    }
+    if (Serial1.available()){
+      String message = Serial1.readStringUntil('\n');
+      Serial.println("Changement de page : " + message);
+    }
+  }
+  else if(commandeBool){
+    if (millis() - commandeLastChange > commandeChangeInterval){
+      changeCommande();
+    }
+  }
+  else if(regleBool){
+    if (millis() - regleLastChange > regleChangeInterval){
+      changeRegleTexte();
+    }
+  }
+  else if(startGame){
+    gameFunction();
+    delay(VITESSE);
+  }
+  else if(pauseMenu){
+    if (millis() - pauseMenuLastChoice > pauseMenuInterval){
+      pauseFunction();
+    }
+  }
+  else if (gameOver){
+    gameOverFunction();
+  }
 }
