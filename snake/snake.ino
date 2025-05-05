@@ -138,13 +138,16 @@ void changeHomeChoice(){
       axis = axisStored; 
       sens = sensStored;
       restartGame();
+      Serial.println("On lance le jeu et quitte le menu home.");
       delay(500);
     }
     else if(homeChoice == 2){ // Lancement de la page des commandes
       commandeBool = true;
       homeMenu = false;
+      Serial.println("On quit le menu home pour entrer dans les commandes.");
     }
     else if (homeChoice == 3){ // Lancement de la page des règles
+      Serial.println("On quit le menu home pour entrer dans les règles.");
       regleBool = true;
       homeMenu = false;
     }
@@ -171,7 +174,7 @@ void changeRegleTexte(){
   joystickX = analogRead(JOYSTICK_X);
   if (joystickX == 1023 && !joystickPressed){
     joystickPressed = true;
-    Serial.println("Retour au menu : " + String(joystickX));
+    Serial.println("Retour au menu");
     regleLastChange = millis();
     homeMenu = true;
     regleBool = false;
@@ -182,10 +185,12 @@ void changeRegleTexte(){
     if (joystickX < 400){
       regleLastChange = millis();
       Serial1.println("P"); // P pour précédent
+      Serial.println("Page de règle précédente");
     }
     else if (joystickX > 700 && joystickX <1000){
       regleLastChange = millis();
       Serial1.println("S"); // S pour suivant
+      Serial.println("Page de règle suivante");
     }
   }
 }
@@ -194,7 +199,7 @@ void changeCommande(){
   joystickX = analogRead(JOYSTICK_X);
   if (joystickX == 1023 && !joystickPressed){
     joystickPressed = true;
-    Serial.println("Retour au menu : " + String(joystickX));
+    Serial.println("Retour au menu");
     commandeLastChange = millis();
     homeMenu = true;
     commandeBool = false;
@@ -205,12 +210,12 @@ void changeCommande(){
     if (joystickX < 400){
       commandeLastChange = millis();
       Serial1.println("P"); // P pour précédent
-      Serial.print("joystick change commande P");
+      Serial.println("Page de commande précédente");
     }
     else if (joystickX > 700 && joystickX <1000){
       commandeLastChange = millis();
       Serial1.println("S"); // S pour suivant
-      Serial.println("Joystick change commande S");
+      Serial.println("Page de commande suivante");
     }
   }
 }
@@ -405,9 +410,7 @@ void snakeEat(){
       if(VITESSE > V_MAX){
           VITESSE = (random(1,4) == 3) ? VITESSE -= 10 : VITESSE;
           Serial1.println("V:" + String((200 - VITESSE)/10));
-          Serial.print("envoyé : ");
-          Serial.print("Vitesse : ");
-          Serial.println((200 - VITESSE) /10);
+          Serial.println("envoyé : VITESSE " + String((200 - VITESSE) /10));
         }
         snake.add(snake[ snake.getSize()-1 ]); // On ajoute au serpent son dernier pixel
         Serial1.println("S:" + String(snake.getSize() - 3));
@@ -416,20 +419,16 @@ void snakeEat(){
         if(VITESSE > V_MAX){
           VITESSE = (random(1,5) == 4) ? VITESSE -= 10 : VITESSE;
           Serial1.println("V:" + String((200 - VITESSE)/10));
-          Serial.print("envoyé : ");
-          Serial.print("Vitesse : ");
-          Serial.println((200 - VITESSE) /10);
+          Serial.println("envoyé : VITESSE " + String((200 - VITESSE) /10));
         }
         snake.add(snake[ snake.getSize()-1 ]); // On ajoute au serpent son dernier pixel
         Serial1.println("S:" + String(snake.getSize() - 3));
-        Serial.print("envoyé : ");
-        Serial.println(snake.getSize()-3);
+        Serial.println("envoyé : " + String(snake.getSize()-3));
       }
       else if(food_couleur==ORANGE){ // Si c'est orange on ralentit la vitesse en la multipliant par deux et on enlève une vie
         if(VITESSE < V_MIN){
           VITESSE = (random(1,5) == 4) ? VITESSE += 10 : VITESSE;
-          Serial.print("Vitesse : ");
-          Serial.println((200 - VITESSE) /10);
+          Serial.println("envoyé : VITESSE " + String((200 - VITESSE) /10));
           Serial1.println("V:" + String( (200 - VITESSE) /10));
         }
         // Enlève un pixel au serpent
@@ -586,13 +585,13 @@ void pauseFunction(){
       pauseMenuLastChoice = millis();
       pauseChoice = (pauseChoice == 1) ? 2 : 1;
       Serial1.println("C:"+ String(pauseChoice));
-      Serial.println("Envoyé : " + String(pauseChoice));
+      Serial.println("Changement de la sélection");
     }
     else if (joystickY < 400){ // Sélection de l'option du dessous
       pauseMenuLastChoice = millis();
       pauseChoice = (pauseChoice == 1) ? 2 : 1;
       Serial1.println("C:"+ String(pauseChoice));
-      Serial.println("Envoyé : " + String(pauseChoice));
+      Serial.println("Changement de la sélection");
     }
   }
 }
@@ -604,7 +603,6 @@ void loop() {
     }
     if (Serial1.available()){
       String message = Serial1.readStringUntil('\n');
-      Serial.println("Changement de page : " + message);
     }
   }
   else if(commandeBool){
