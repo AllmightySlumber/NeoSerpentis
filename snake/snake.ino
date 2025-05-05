@@ -20,6 +20,15 @@
 
 DFRobot_RGBMatrix matrix(A, B, C, D, E, CLK, LAT, OE, false, WIDTH, _HIGH);
 
+
+// Paramètre vitesse du jeu
+const int V_MAX = 80;
+const int V_MIN = 200;
+int VITESSE = 200;
+
+TimerFour timer; // Timer utiliser pour certaines fonctions
+
+
 // Structure pour créer des positions tels que (x,y) et pouvoir accéder à x et y.
 struct Position{
   int x;
@@ -32,23 +41,16 @@ struct Food{
 struct Obstacle{
   List<Position> v;
 };
+// List de nourriture et une pour le serpent
+List<Position> snake;
+volatile List<Food> foodStock;
 
+// Les couleurs de nourriture
 const int BLEU=16;
 const int VERT=8;
 const int ORANGE=2;
 const int ROUGE=0;
-const int V_MAX = 80;
-const int V_MIN = 200;
-int VITESSE = 200;
-int VIE = 1;
-bool startGame = false;
-bool pauseMenu = false;
-
-TimerFour timer;
-
-List<Position> snake; // Tableau de position du serpent de base
-volatile List<Food> foodStock; // Tableau de nourriture
-
+// Les entiers de nourriture utilisé dans les millis()
 const int NOURRITURE_MAX = 20;
 unsigned  long greenFoodTime = 0;
 unsigned  long redFoodTime = 0;
@@ -56,36 +58,36 @@ unsigned  long blueFoodTime = 0;
 unsigned  long orangeFoodTime = 0;
 unsigned  long foodInterval = 10000; // 10 secondes
 
-unsigned  long mouvementTime = 0;
-unsigned  long mouvementInterval = 100;
-
-bool showGameOver = true;
+// Les temps utiliser pour faire clignoté le Game Over
 unsigned long lastBlinkTime = 0;
 unsigned long blinkInterval = 1000; // 1s allumé
 
+// Les booléens utiliser pour naviguer entres les pages home, regle, commandes, ...
+bool startGame = false;
+bool pauseMenu = false;
 bool gameOver = false;
 bool homeMenu = true;
 bool commandeBool = false;
-bool regleBool = false; 
+bool regleBool = false;
+bool showGameOver = true;
+
+// Les qui permettent de naviguer entre les différent choix dans le menu home et pause
 int homeChoice = 1;
 int pauseChoice = 1;
-bool justArrived = false;
 
-unsigned long homeLastChoix = 0;
-unsigned long homeChoixInterval = 400;
+// Les entiers qui servent de mémoire pour savoir quand on a faire notre derniere action
+unsigned  long actionInterval = 400; // Interval après laquel on peut faire une action après en avoir fait une
+unsigned  long homeLastChoix = 0;
 unsigned  long regleLastChange = 0;
-unsigned  long regleChangeInterval = 400;
 unsigned  long commandeLastChange = 0;
-unsigned  long commandeChangeInterval = 400;
 unsigned  long pauseMenuLastChoice = 0;
-unsigned  long pauseMenuInterval = 400;
 
-
-// direction de base
+// La direction et le sens de base
 String axis = "horizontale"; 
 int sens = 1;
 String axisStored = axis;
 int sensStored = sens;
+
 // variables pour bloquer les changements en sens opposé
 int lastDir = sens; 
 String lastAxis = axis;
@@ -598,7 +600,7 @@ void pauseFunction(){
 
 void loop() {
   if (homeMenu){
-    if(millis() - homeLastChoix > homeChoixInterval) {// Si notre dernier choix remonte à 200 milisecondes on peut à nouveaux choisir
+    if(millis() - homeLastChoix > actionInterval) {// Si notre dernier choix remonte à 200 milisecondes on peut à nouveaux choisir
       changeHomeChoice();
     }
     if (Serial1.available()){
@@ -606,12 +608,12 @@ void loop() {
     }
   }
   else if(commandeBool){
-    if (millis() - commandeLastChange > commandeChangeInterval){
+    if (millis() - commandeLastChange > actionInterval){
       changeCommande();
     }
   }
   else if(regleBool){
-    if (millis() - regleLastChange > regleChangeInterval){
+    if (millis() - regleLastChange > actionInterval){
       changeRegleTexte();
     }
   }
@@ -620,7 +622,7 @@ void loop() {
     delay(VITESSE);
   }
   else if(pauseMenu){
-    if (millis() - pauseMenuLastChoice > pauseMenuInterval){
+    if (millis() - pauseMenuLastChoice > actionInterval){
       pauseFunction();
     }
   }

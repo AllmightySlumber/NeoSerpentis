@@ -553,7 +553,7 @@ void pauseFunction(){
       message = Serial1.readStringUntil('\n');
       if (message.startsWith("C")){
         String choix = message.substring(2);
-        Serial.print("Choix :" + choix);
+        Serial.println("Choix :" + choix);
         pauseChoice = choix.toInt();
         pauseMenuChoice();
       }
