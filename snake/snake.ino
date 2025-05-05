@@ -38,9 +38,7 @@ struct Food{
   Position p;
   int couleur;
 };
-struct Obstacle{
-  List<Position> v;
-};
+
 // List de nourriture et une pour le serpent
 List<Position> snake;
 volatile List<Food> foodStock;
