@@ -3,7 +3,7 @@
 Pour faire tourner ce projet, il faut être en possession de deux matrices leds 64x64, deux arduino, d'un joystick connecter à l'un des deux arduino qui sera donc l'arduino principale.
 
 Branchement :
-PC -> Arduino principale -> Matrice principale 
+PC -> Arduino principale -> Matrice principale\n
 Arduino principale -> joystick
 PC -> Arduino secondaire -> Matrice secondaire
 Arduino principale -> Arduino secondaire
